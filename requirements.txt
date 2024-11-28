@@ -1,0 +1,6 @@
+streamlit
+keras-facenet
+ultralytics
+numpy
+opencv-python
+werkzeug
