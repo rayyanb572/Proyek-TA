@@ -137,9 +137,11 @@ def main():
                 for folder_name in os.listdir(output_folder):
                     folder_path = os.path.join(output_folder, folder_name)
                     st.write(f"📂 Folder: {folder_name}")
-                    for file_name in os.listdir(folder_path):
-                        st.image(os.path.join(folder_path, file_name), caption=file_name, use_column_width=True)
-                
+                    files = os.listdir(folder_path)[:5]  # Limit to 5 files
+                    for file_name in files:
+                        file_path = os.path.join(folder_path, file_name)
+                        st.image(file_path, caption=file_name, width=150)  # Smaller preview size
+
                 # Add download link for the output folder
                 zip_path = zip_folder(output_folder, "output_test")
                 with open(zip_path, "rb") as zip_file:
