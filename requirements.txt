@@ -1,8 +1,8 @@
 streamlit
-tensorflow
 keras-facenet
+opencv-python-headless
 ultralytics
 numpy
-opencv-python-headless
 werkzeug
+tensorflow
 omegaconf
