@@ -2,5 +2,6 @@ streamlit
 keras-facenet
 ultralytics
 numpy
-opencv-python
+opencv-python-headless
 werkzeug
+omegaconf
