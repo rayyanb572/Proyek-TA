@@ -122,14 +122,15 @@ def main():
     st.title("Face Classification App")
     st.write("Upload all image files you want to classify.")
 
-    # --- Button to Clear Uploads Folder with Confirmation ---
-    if st.button("Clear"):
-        if st.confirm("Are you sure you want to clear the uploads folder and reset the app?"):
+    # --- Button to Clear Uploads Folder ---
+    if st.button("Clear Uploads Folder"):
+        confirmation = st.text_input("Type 'CONFIRM' to reset the app and clear the uploads folder:")
+        if confirmation == "CONFIRM":
             clear_uploads_folder()
             st.session_state.uploaded_files = []  # Clear uploaded files in session state
             st.success("Uploads folder has been cleared and reset.")
-        else:
-            st.warning("Clear action was cancelled.")
+        elif confirmation:
+            st.warning("Invalid input. Type 'CONFIRM' to proceed.")
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
