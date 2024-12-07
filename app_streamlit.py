@@ -141,9 +141,16 @@ def main():
                     
                     # List and display files in each subfolder
                     files = sorted(os.listdir(folder_path))  # Sort files within each subfolder
-                    for file_name in files[:5]:  # Limit to 5 files for preview
+                    
+                    # Create columns dynamically based on the number of files to display
+                    num_columns = 4  # Adjust the number of columns to fit the screen
+                    columns = st.columns(num_columns)
+
+                    for idx, file_name in enumerate(files[:5]):  # Limit to 5 files for preview
                         file_path = os.path.join(folder_path, file_name)
-                        st.image(file_path, caption=file_name, width=150)  # Smaller preview size
+                        column_idx = idx % num_columns  # Ensure files fit in columns
+                        with columns[column_idx]:
+                            st.image(file_path, caption=file_name, width=150)  # Smaller preview size
 
                 # Add download link for the output folder
                 zip_path = zip_folder(output_folder, "output_test")
