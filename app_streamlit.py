@@ -6,7 +6,6 @@ import pickle
 import numpy as np
 from keras_facenet import FaceNet
 from ultralytics import YOLO
-import tempfile
 import zipfile
 
 # --- Load YOLO Model and Face Embeddings ---
@@ -101,7 +100,7 @@ def zip_folder(folder_path, zip_name):
 # --- Streamlit Application ---
 def clear_uploads_folder(folder_path="uploads"):
     """
-    Clear the contents of the uploads folder.
+    Clear the contents of the uploads folder and reset the session state for uploaded files.
     """
     if os.path.exists(folder_path):
         for filename in os.listdir(folder_path):
@@ -115,22 +114,35 @@ def clear_uploads_folder(folder_path="uploads"):
                 print(f"Error while deleting {file_path}: {e}")
     os.makedirs(folder_path, exist_ok=True)
 
+    # Reset uploaded files in session state
+    if "uploaded_files" in st.session_state:
+        del st.session_state["uploaded_files"]
+
 def main():
     st.title("Face Classification App")
     st.write("Upload all image files you want to classify.")
 
-    # --- Button to Clear Uploads Folder ---
-    if st.button("Clear Uploads Folder"):
-        clear_uploads_folder()
-        st.success("Uploads folder has been cleared.")
+    # --- Button to Clear Uploads Folder with Confirmation ---
+    if st.button("Clear"):
+        if st.confirm("Are you sure you want to clear the uploads folder and reset the app?"):
+            clear_uploads_folder()
+            st.session_state.uploaded_files = []  # Clear uploaded files in session state
+            st.success("Uploads folder has been cleared and reset.")
+        else:
+            st.warning("Clear action was cancelled.")
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
+    # Save uploaded files in session state
     if uploaded_files:
+        st.session_state.uploaded_files = uploaded_files
         st.write(f"{len(uploaded_files)} file(s) successfully uploaded.")
+
+    # --- Process the uploaded files ---
+    if "uploaded_files" in st.session_state and st.session_state.uploaded_files:
         if st.button("Process Images"):
-            output_folder = classify_faces(uploaded_files)
+            output_folder = classify_faces(st.session_state.uploaded_files)
             st.success(f"Processing complete! Output folder: {output_folder}")
 
             if os.path.exists(output_folder):
