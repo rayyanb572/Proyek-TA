@@ -1,7 +1,7 @@
 streamlit
 keras-facenet
 opencv-python-headless
-ultralytics
+ultralytics==8.0.20
 numpy
 werkzeug
 tensorflow
