@@ -7,6 +7,7 @@ import numpy as np
 from keras_facenet import FaceNet
 from ultralytics import YOLO
 import tempfile
+import zipfile
 
 # --- Load YOLO Model and Face Embeddings ---
 @st.cache_resource
@@ -86,6 +87,17 @@ def classify_faces(file_list, output_folder="output_test"):
 
     return output_folder
 
+def zip_folder(folder_path, zip_name):
+    """Create a ZIP file of the given folder."""
+    zip_path = f"{zip_name}.zip"
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, start=folder_path)
+                zipf.write(file_path, arcname)
+    return zip_path
+
 # --- Streamlit Application ---
 def clear_uploads_folder(folder_path="uploads"):
     """
@@ -127,6 +139,16 @@ def main():
                     st.write(f"📂 Folder: {folder_name}")
                     for file_name in os.listdir(folder_path):
                         st.image(os.path.join(folder_path, file_name), caption=file_name, use_column_width=True)
+                
+                # Add download link for the output folder
+                zip_path = zip_folder(output_folder, "output_test")
+                with open(zip_path, "rb") as zip_file:
+                    st.download_button(
+                        label="Download Processed Output",
+                        data=zip_file,
+                        file_name="output_test.zip",
+                        mime="application/zip"
+                    )
 
 if __name__ == "__main__":
     main()
