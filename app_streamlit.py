@@ -134,11 +134,14 @@ def main():
             st.success(f"Processing complete! Output folder: {output_folder}")
 
             if os.path.exists(output_folder):
-                for folder_name in os.listdir(output_folder):
+                # Iterate over subfolders (e.g., person folders, 'unknown' folder)
+                for folder_name in sorted(os.listdir(output_folder)):  # Sort subfolders alphabetically
                     folder_path = os.path.join(output_folder, folder_name)
                     st.write(f"📂 Folder: {folder_name}")
-                    files = os.listdir(folder_path)[:5]  # Limit to 5 files
-                    for file_name in files:
+                    
+                    # List and display files in each subfolder
+                    files = sorted(os.listdir(folder_path))  # Sort files within each subfolder
+                    for file_name in files[:5]:  # Limit to 5 files for preview
                         file_path = os.path.join(folder_path, file_name)
                         st.image(file_path, caption=file_name, width=150)  # Smaller preview size
 
