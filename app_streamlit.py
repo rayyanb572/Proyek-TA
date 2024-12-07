@@ -57,8 +57,7 @@ def classify_faces(file_list, output_folder="output_test"):
             temp_path = os.path.join("uploads", file.name)
             with open(temp_path, "wb") as f:
                 f.write(file.getbuffer())
-            st.write(f"File saved temporarily at: {temp_path}")
-
+            
             image = cv2.imread(temp_path)
             if image is None:
                 st.error(f"Invalid image: {file.name}.")
