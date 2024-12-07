@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 from keras_facenet import FaceNet
 from ultralytics import YOLO
+import tempfile
 
 # --- Load YOLO Model and Face Embeddings ---
 @st.cache_resource
@@ -47,32 +48,42 @@ def clear_folder(folder_path):
 
 def classify_faces(file_list, output_folder="output_test"):
     unknown_folder = os.path.join(output_folder, "unknown")
+    os.makedirs("uploads", exist_ok=True)  # Ensure 'uploads' folder exists
     clear_folder(output_folder)
     clear_folder(unknown_folder)
 
     for file in file_list:
-        temp_path = os.path.join("uploads", file.name)
-        with open(temp_path, "wb") as f:
-            f.write(file.getbuffer())
+        try:
+            temp_path = os.path.join("uploads", file.name)
+            with open(temp_path, "wb") as f:
+                f.write(file.getbuffer())
+            st.write(f"File saved temporarily at: {temp_path}")
 
-        image = cv2.imread(temp_path)
+            image = cv2.imread(temp_path)
+            if image is None:
+                st.error(f"Invalid image: {file.name}.")
+                continue
 
-        results = yolo_model.predict(image)
-        if not results or not results[0].boxes:
-            continue
+            results = yolo_model.predict(image)
+            if not results or not results[0].boxes:
+                st.warning(f"No faces found in {file.name}.")
+                continue
 
-        for bbox in results[0].boxes.xyxy.numpy():
-            face_image = crop_face(image, bbox)
-            face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
-            face_embedding = embedder.embeddings([face_image_rgb])[0]
+            for bbox in results[0].boxes.xyxy.numpy():
+                face_image = crop_face(image, bbox)
+                face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+                face_embedding = embedder.embeddings([face_image_rgb])[0]
 
-            match = find_match(face_embedding)
-            if match:
-                person_folder = os.path.join(output_folder, match)
-                os.makedirs(person_folder, exist_ok=True)
-                shutil.copy(temp_path, person_folder)
-            else:
-                shutil.copy(temp_path, unknown_folder)
+                match = find_match(face_embedding)
+                if match:
+                    person_folder = os.path.join(output_folder, match)
+                    os.makedirs(person_folder, exist_ok=True)
+                    shutil.copy(temp_path, person_folder)
+                else:
+                    shutil.copy(temp_path, unknown_folder)
+
+        except Exception as e:
+            st.error(f"Error processing file {file.name}: {e}")
 
     return output_folder
 
@@ -95,21 +106,21 @@ def clear_uploads_folder(folder_path="uploads"):
 
 def main():
     st.title("Face Classification App")
-    st.write("Unggah semua file gambar yang ingin diklasifikasikan.")
+    st.write("Upload all image files you want to classify.")
 
-    # --- Tombol untuk Menghapus Isi Folder Uploads ---
-    if st.button("Hapus Semua Isi Uploads"):
+    # --- Button to Clear Uploads Folder ---
+    if st.button("Clear Uploads Folder"):
         clear_uploads_folder()
-        st.success("Isi folder 'uploads' telah dihapus.")
+        st.success("Uploads folder has been cleared.")
 
-    # --- Pengunggahan File ---
-    uploaded_files = st.file_uploader("Upload File Gambar", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+    # --- File Upload ---
+    uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
     if uploaded_files:
-        st.write(f"{len(uploaded_files)} file berhasil diunggah.")
-        if st.button("Proses Gambar"):
+        st.write(f"{len(uploaded_files)} file(s) successfully uploaded.")
+        if st.button("Process Images"):
             output_folder = classify_faces(uploaded_files)
-            st.success(f"Proses selesai! Folder output: {output_folder}")
+            st.success(f"Processing complete! Output folder: {output_folder}")
 
             if os.path.exists(output_folder):
                 for folder_name in os.listdir(output_folder):
