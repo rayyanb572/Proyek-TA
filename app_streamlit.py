@@ -118,7 +118,6 @@ def zip_folder(folder_path, zip_name):
                 zipf.write(file_path, arcname)
     return zip_path
 
-
 def clear_uploads_folder(folder_path="uploads"):
     """
     Clear the contents of the uploads folder and reset the session state for uploaded files.
@@ -135,11 +134,8 @@ def clear_uploads_folder(folder_path="uploads"):
                 logging.error(f"Error while deleting {file_path}: {e}")
     os.makedirs(folder_path, exist_ok=True)
 
-def reset_app_state():
-    """Clear all folders and reset application state."""
-    clear_uploads_folder()
-    clear_folder("output_test")
-    st.session_state.clear()
+    if "uploaded_files" in st.session_state:
+        del st.session_state["uploaded_files"]
 
 def main():
     st.title("Face Classification App")
@@ -147,8 +143,10 @@ def main():
 
     # --- Button to Clear Uploads Folder ---
     if st.button("Clear"):
-        reset_app_state()
-        st.success("Application has been reset to its initial state.")
+        if st.confirm("Are you sure you want to clear all uploaded files?"):
+            clear_uploads_folder()
+            st.session_state.uploaded_files = []
+            st.success("Uploads folder has been cleared and reset.")
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
