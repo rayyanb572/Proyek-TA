@@ -140,8 +140,7 @@ def main():
     # --- Button to Clear All Data ---
     if st.button("Clear"):
         clear_all_data()
-        st.success("Application has been reset to its initial state.")
-        st.stop()
+        st.success("Application has been reset. Please upload new files to start.")
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
