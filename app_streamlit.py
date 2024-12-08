@@ -55,6 +55,7 @@ def clear_folder(folder_path):
 
 @st.cache_data
 def classify_faces(file_list, output_folder="output_test"):
+    os.makedirs("uploads", exist_ok=True)  # Pastikan folder uploads ada
     unknown_folder = os.path.join(output_folder, "unknown")
     clear_folder(output_folder)
     clear_folder(unknown_folder)
@@ -68,6 +69,10 @@ def classify_faces(file_list, output_folder="output_test"):
             with open(temp_path, "wb") as f:
                 f.write(file.getbuffer())
             
+            # Pastikan file berhasil disimpan
+            if not os.path.exists(temp_path):
+                raise FileNotFoundError(f"File {temp_path} not found after writing.")
+
             image = cv2.imread(temp_path)
             if image is None:
                 logging.warning(f"Invalid image: {file.name}.")
@@ -100,6 +105,7 @@ def classify_faces(file_list, output_folder="output_test"):
         progress_bar.progress((idx + 1) / total_files)
 
     return output_folder
+
 
 def zip_folder(folder_path, zip_name):
     """Create a ZIP file of the given folder."""
