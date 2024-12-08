@@ -56,54 +56,53 @@ def clear_folder(folder_path):
 def classify_faces(file_list, output_folder="output_test"):
     os.makedirs("uploads", exist_ok=True)  # Ensure uploads folder exists
     unknown_folder = os.path.join(output_folder, "unknown")
-    clear_folder(output_folder)
-    clear_folder(unknown_folder)
+    
+    # Clear existing folders
+    if os.path.exists(output_folder):
+        shutil.rmtree(output_folder)
+    os.makedirs(output_folder)
+    os.makedirs(unknown_folder)
 
-    progress_bar = st.progress(0)
-    total_files = len(file_list)
-
-    for idx, file in enumerate(file_list):
+    for file in file_list:
         try:
-            with st.spinner(f"Uploading and processing {file.name}..."):
-                temp_path = os.path.join("uploads", file.name)
-                with open(temp_path, "wb") as f:
-                    f.write(file.getbuffer())
+            temp_path = os.path.join("uploads", file.name)
+            with open(temp_path, "wb") as f:
+                f.write(file.getbuffer())
 
-                if not os.path.exists(temp_path):
-                    raise FileNotFoundError(f"File {temp_path} not found after writing.")
+            if not os.path.exists(temp_path):
+                raise FileNotFoundError(f"File {temp_path} not found after writing.")
 
-                image = cv2.imread(temp_path)
-                if image is None:
-                    logging.warning(f"Invalid image: {file.name}.")
-                    st.error(f"Invalid image: {file.name}.")
-                    continue
+            image = cv2.imread(temp_path)
+            if image is None:
+                logging.warning(f"Invalid image: {file.name}.")
+                st.warning(f"Invalid image: {file.name}.")
+                continue
 
-                results = yolo_model.predict(image)
-                if not results or not results[0].boxes:
-                    logging.info(f"No faces found in {file.name}.")
-                    st.warning(f"No faces found in {file.name}.")
-                    continue
+            results = yolo_model.predict(image)
+            if not results or not results[0].boxes:
+                logging.info(f"No faces found in {file.name}.")
+                st.warning(f"No faces found in {file.name}.")
+                continue
 
-                for bbox in results[0].boxes.xyxy.numpy():
-                    face_image = crop_face(image, bbox)
-                    face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
-                    face_embedding = embedder.embeddings([face_image_rgb])[0]
+            for bbox in results[0].boxes.xyxy.numpy():
+                face_image = crop_face(image, bbox)
+                face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+                face_embedding = embedder.embeddings([face_image_rgb])[0]
 
-                    match = find_match(face_embedding)
-                    if match:
-                        person_folder = os.path.join(output_folder, match)
-                        os.makedirs(person_folder, exist_ok=True)
-                        shutil.copy(temp_path, person_folder)
-                    else:
-                        shutil.copy(temp_path, unknown_folder)
+                match = find_match(face_embedding)
+                if match:
+                    person_folder = os.path.join(output_folder, match)
+                    os.makedirs(person_folder, exist_ok=True)
+                    shutil.copy(temp_path, person_folder)
+                else:
+                    shutil.copy(temp_path, unknown_folder)
 
         except Exception as e:
             logging.error(f"Error processing file {file.name}: {e}")
             st.error(f"Error processing file {file.name}: {e}")
 
-        progress_bar.progress((idx + 1) / total_files)
-
     return output_folder
+
 
 
 def zip_folder(folder_path, zip_name):
@@ -159,6 +158,8 @@ def main():
         st.session_state.processing_error = False
     if 'total_files_uploaded' not in st.session_state:
         st.session_state.total_files_uploaded = 0
+    if 'is_uploading' not in st.session_state:
+        st.session_state.is_uploading = False
 
     # Clear button with more explicit reset
     if st.button("Clear All"):
@@ -166,19 +167,22 @@ def main():
         st.session_state.processing_completed = False
         st.session_state.processing_error = False
         st.session_state.total_files_uploaded = 0
+        st.session_state.is_uploading = False
 
-    # File uploader with state tracking
-    uploaded_files = st.file_uploader(
-        "Upload Image Files", 
-        type=["jpg", "jpeg", "png"], 
-        accept_multiple_files=True,
-        key=f"file_uploader_{st.session_state.get('upload_key', 0)}"  # Unique key to reset uploader
-    )
+    # File uploader with state tracking and loading state
+    with st.spinner('Uploading files...'):
+        uploaded_files = st.file_uploader(
+            "Upload Image Files", 
+            type=["jpg", "jpeg", "png"], 
+            accept_multiple_files=True,
+            key=f"file_uploader_{st.session_state.get('upload_key', 0)}"
+        )
 
     # Track uploaded files
     if uploaded_files:
         st.session_state.uploaded_files = uploaded_files
         st.session_state.total_files_uploaded = len(uploaded_files)
+        st.session_state.is_uploading = False
         st.write(f"{st.session_state.total_files_uploaded} file(s) successfully uploaded.")
 
     # Processing button with enhanced state management
