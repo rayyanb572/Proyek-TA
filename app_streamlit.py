@@ -118,21 +118,17 @@ def zip_folder(folder_path, zip_name):
                 zipf.write(file_path, arcname)
     return zip_path
 
-def clear_uploads_folder(folder_path="uploads"):
+def clear_all_data():
     """
-    Clear the contents of the uploads folder and reset the session state for uploaded files.
+    Clear all application data, including uploaded files and processed output.
+    Reset session state to initial conditions.
     """
-    if os.path.exists(folder_path):
-        for filename in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, filename)
-            try:
-                if os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-                else:
-                    os.remove(file_path)
-            except Exception as e:
-                logging.error(f"Error while deleting {file_path}: {e}")
-    os.makedirs(folder_path, exist_ok=True)
+    folders_to_clear = ["uploads", "output_test"]
+    for folder in folders_to_clear:
+        if os.path.exists(folder):
+            shutil.rmtree(folder)
+    for folder in folders_to_clear:
+        os.makedirs(folder, exist_ok=True)
 
     if "uploaded_files" in st.session_state:
         del st.session_state["uploaded_files"]
@@ -141,12 +137,11 @@ def main():
     st.title("Face Classification App")
     st.write("Upload all image files you want to classify.")
 
-    # --- Button to Clear Uploads Folder ---
+    # --- Button to Clear All Data ---
     if st.button("Clear"):
-        if st.confirm("Are you sure you want to clear all uploaded files?"):
-            clear_uploads_folder()
-            st.session_state.uploaded_files = []
-            st.success("Uploads folder has been cleared and reset.")
+        clear_all_data()
+        st.success("Application has been reset to its initial state.")
+        st.stop()
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
@@ -165,7 +160,7 @@ def main():
                 if os.path.exists(output_folder):
                     for folder_name in sorted(os.listdir(output_folder)):
                         folder_path = os.path.join(output_folder, folder_name)
-                        st.write(f"📂 Folder: {folder_name}")
+                        st.write(f"\U0001F4C2 Folder: {folder_name}")
 
                         files = sorted(os.listdir(folder_path))
                         num_columns = 4
