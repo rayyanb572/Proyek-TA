@@ -116,6 +116,7 @@ def zip_folder(folder_path, zip_name):
     return zip_path
 
 def clear_all_data():
+    # Clear physical folders
     folders_to_clear = ["uploads", "output_test"]
     for folder in folders_to_clear:
         if os.path.exists(folder):
@@ -123,51 +124,109 @@ def clear_all_data():
     for folder in folders_to_clear:
         os.makedirs(folder, exist_ok=True)
 
-    if "uploaded_files" in st.session_state:
-        del st.session_state["uploaded_files"]
+    # Reset all session states
+    reset_session_states()
+
+def reset_session_states():
+    # Reset all application-specific session states
+    session_states_to_reset = [
+        "uploaded_files",
+        "processing_completed",
+        "output_folder",
+        "processing_error",
+        "total_files_uploaded"
+    ]
+
+    for state in session_states_to_reset:
+        if state in st.session_state:
+            del st.session_state[state]
+
+    # Initialize default states
+    st.session_state.processing_completed = False
+    st.session_state.processing_error = False
+    st.session_state.total_files_uploaded = 0
 
 def main():
     st.title("Face Classification App")
     st.write("Upload all image files you want to classify.")
 
-    if st.button("Clear"):
+    # Initialize session states if not already set
+    if 'processing_completed' not in st.session_state:
+        st.session_state.processing_completed = False
+    if 'processing_error' not in st.session_state:
+        st.session_state.processing_error = False
+    if 'total_files_uploaded' not in st.session_state:
+        st.session_state.total_files_uploaded = 0
+
+    # Clear button with more explicit reset
+    if st.button("Clear All"):
         clear_all_data()
-        st.success("Application has been reset to its initial state.")
+        st.experimental_rerun()  # Rerun the app to reflect the reset
 
-    uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+    # File uploader with state tracking
+    uploaded_files = st.file_uploader(
+        "Upload Image Files", 
+        type=["jpg", "jpeg", "png"], 
+        accept_multiple_files=True
+    )
 
+    # Track uploaded files
     if uploaded_files:
         st.session_state.uploaded_files = uploaded_files
-        st.write(f"{len(uploaded_files)} file(s) successfully uploaded.")
+        st.session_state.total_files_uploaded = len(uploaded_files)
+        st.write(f"{st.session_state.total_files_uploaded} file(s) successfully uploaded.")
 
-    if "uploaded_files" in st.session_state and st.session_state.uploaded_files:
+    # Processing button with enhanced state management
+    if st.session_state.total_files_uploaded > 0:
         if st.button("Process Images"):
-            with st.spinner("Processing images..."):
-                output_folder = classify_faces(st.session_state.uploaded_files)
+            try:
+                with st.spinner("Processing images..."):
+                    output_folder = classify_faces(st.session_state.uploaded_files)
+                    
+                    # Update session states
+                    st.session_state.processing_completed = True
+                    st.session_state.output_folder = output_folder
+                    st.session_state.processing_error = False
+
                 st.success(f"Processing complete! Output folder: {output_folder}")
 
-                if os.path.exists(output_folder):
-                    for folder_name in sorted(os.listdir(output_folder)):
-                        folder_path = os.path.join(output_folder, folder_name)
-                        st.write(f"\U0001F4C2 Folder: {folder_name}")
+            except Exception as e:
+                st.session_state.processing_completed = False
+                st.session_state.processing_error = True
+                st.error(f"Processing failed: {str(e)}")
 
-                        files = sorted(os.listdir(folder_path))
-                        num_columns = 4
-                        columns = st.columns(num_columns)
+    # Display results if processing is completed
+    if st.session_state.processing_completed:
+        output_folder = st.session_state.output_folder
+        
+        if os.path.exists(output_folder):
+            for folder_name in sorted(os.listdir(output_folder)):
+                folder_path = os.path.join(output_folder, folder_name)
+                st.write(f"\U0001F4C2 Folder: {folder_name}")
 
-                        for idx, file_name in enumerate(files[:8]):
-                            file_path = os.path.join(folder_path, file_name)
-                            column_idx = idx % num_columns
-                            with columns[column_idx]:
-                                st.image(file_path, caption=file_name, width=150)
+                files = sorted(os.listdir(folder_path))
+                num_columns = 4
+                columns = st.columns(num_columns)
 
-                    zip_path = zip_folder(output_folder, "output_test")
-                    with open(zip_path, "rb") as zip_file:
-                        st.download_button(
-                            label="Download Processed Output",
-                            data=zip_file,
-                            file_name="output_test.zip",
-                            mime="application/zip"
-                        )
+                for idx, file_name in enumerate(files[:8]):
+                    file_path = os.path.join(folder_path, file_name)
+                    column_idx = idx % num_columns
+                    with columns[column_idx]:
+                        st.image(file_path, caption=file_name, width=150)
+
+            # Zip and download option
+            zip_path = zip_folder(output_folder, "output_test")
+            with open(zip_path, "rb") as zip_file:
+                st.download_button(
+                    label="Download Processed Output",
+                    data=zip_file,
+                    file_name="output_test.zip",
+                    mime="application/zip"
+                )
+
+    # Error handling state
+    if st.session_state.processing_error:
+        st.warning("There was an error during processing. Please try again.")
+
 if __name__ == "__main__":
     main()
