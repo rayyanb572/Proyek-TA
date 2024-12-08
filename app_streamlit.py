@@ -57,13 +57,14 @@ def clear_folder(folder_path):
 def classify_faces(file_list, output_folder="output_test"):
     os.makedirs("uploads", exist_ok=True)  # Ensure uploads folder exists
     unknown_folder = os.path.join(output_folder, "unknown")
-    clear_folder(output_folder)
-    clear_folder(unknown_folder)
+    
+    # Clear existing folders
+    if os.path.exists(output_folder):
+        shutil.rmtree(output_folder)
+    os.makedirs(output_folder)
+    os.makedirs(unknown_folder)
 
-    progress_bar = st.progress(0)
-    total_files = len(file_list)
-
-    for idx, file in enumerate(tqdm(file_list, desc="Processing images")):
+    for file in file_list:
         try:
             temp_path = os.path.join("uploads", file.name)
             with open(temp_path, "wb") as f:
@@ -75,7 +76,7 @@ def classify_faces(file_list, output_folder="output_test"):
             image = cv2.imread(temp_path)
             if image is None:
                 logging.warning(f"Invalid image: {file.name}.")
-                st.error(f"Invalid image: {file.name}.")
+                st.warning(f"Invalid image: {file.name}.")
                 continue
 
             results = yolo_model.predict(image)
@@ -101,50 +102,7 @@ def classify_faces(file_list, output_folder="output_test"):
             logging.error(f"Error processing file {file.name}: {e}")
             st.error(f"Error processing file {file.name}: {e}")
 
-        progress_bar.progress((idx + 1) / total_files)
-
     return output_folder
-
-def zip_folder(folder_path, zip_name):
-    zip_path = f"{zip_name}.zip"
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(folder_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, start=folder_path)
-                zipf.write(file_path, arcname)
-    return zip_path
-
-def clear_all_data():
-    # Clear physical folders
-    folders_to_clear = ["uploads", "output_test"]
-    for folder in folders_to_clear:
-        if os.path.exists(folder):
-            shutil.rmtree(folder)
-    for folder in folders_to_clear:
-        os.makedirs(folder, exist_ok=True)
-
-    # Reset all session states
-    reset_session_states()
-
-def reset_session_states():
-    # Reset all application-specific session states
-    session_states_to_reset = [
-        "uploaded_files",
-        "processing_completed",
-        "output_folder",
-        "processing_error",
-        "total_files_uploaded"
-    ]
-
-    for state in session_states_to_reset:
-        if state in st.session_state:
-            del st.session_state[state]
-
-    # Initialize default states
-    st.session_state.processing_completed = False
-    st.session_state.processing_error = False
-    st.session_state.total_files_uploaded = 0
 
 def main():
     st.title("Face Classification App")
@@ -157,6 +115,8 @@ def main():
         st.session_state.processing_error = False
     if 'total_files_uploaded' not in st.session_state:
         st.session_state.total_files_uploaded = 0
+    if 'is_uploading' not in st.session_state:
+        st.session_state.is_uploading = False
 
     # Clear button with more explicit reset
     if st.button("Clear All"):
@@ -164,19 +124,22 @@ def main():
         st.session_state.processing_completed = False
         st.session_state.processing_error = False
         st.session_state.total_files_uploaded = 0
+        st.session_state.is_uploading = False
 
-    # File uploader with state tracking
-    uploaded_files = st.file_uploader(
-        "Upload Image Files", 
-        type=["jpg", "jpeg", "png"], 
-        accept_multiple_files=True,
-        key=f"file_uploader_{st.session_state.get('upload_key', 0)}"  # Unique key to reset uploader
-    )
+    # File uploader with state tracking and loading state
+    with st.spinner('Uploading files...'):
+        uploaded_files = st.file_uploader(
+            "Upload Image Files", 
+            type=["jpg", "jpeg", "png"], 
+            accept_multiple_files=True,
+            key=f"file_uploader_{st.session_state.get('upload_key', 0)}"
+        )
 
     # Track uploaded files
     if uploaded_files:
         st.session_state.uploaded_files = uploaded_files
         st.session_state.total_files_uploaded = len(uploaded_files)
+        st.session_state.is_uploading = False
         st.write(f"{st.session_state.total_files_uploaded} file(s) successfully uploaded.")
 
     # Processing button with enhanced state management
