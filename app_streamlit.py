@@ -118,6 +118,7 @@ def zip_folder(folder_path, zip_name):
                 zipf.write(file_path, arcname)
     return zip_path
 
+
 def clear_uploads_folder(folder_path="uploads"):
     """
     Clear the contents of the uploads folder and reset the session state for uploaded files.
@@ -143,10 +144,9 @@ def main():
 
     # --- Button to Clear Uploads Folder ---
     if st.button("Clear"):
-        if st.confirm("Are you sure you want to clear all uploaded files?"):
-            clear_uploads_folder()
-            st.session_state.uploaded_files = []
-            st.success("Uploads folder has been cleared and reset.")
+        clear_uploads_folder()
+        st.session_state.uploaded_files = []
+        st.success("Uploads folder has been cleared and reset.")
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
