@@ -130,20 +130,16 @@ def main():
     st.title("Face Classification App")
     st.write("Upload all image files you want to classify.")
 
-    # Tombol Clear untuk mereset aplikasi
     if st.button("Clear"):
         clear_all_data()
         st.success("Application has been reset to its initial state.")
-        st.experimental_rerun()  # Rerun aplikasi untuk mengembalikan state awal
 
-    # Komponen File Uploader
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
     if uploaded_files:
         st.session_state.uploaded_files = uploaded_files
         st.write(f"{len(uploaded_files)} file(s) successfully uploaded.")
 
-    # Proses Gambar
     if "uploaded_files" in st.session_state and st.session_state.uploaded_files:
         if st.button("Process Images"):
             with st.spinner("Processing images..."):
@@ -173,3 +169,5 @@ def main():
                             file_name="output_test.zip",
                             mime="application/zip"
                         )
+if __name__ == "__main__":
+    main()
