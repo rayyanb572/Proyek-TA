@@ -103,6 +103,8 @@ def classify_faces(file_list, output_folder="output_test"):
 
     return output_folder
 
+
+
 def zip_folder(folder_path, zip_name):
     zip_path = f"{zip_name}.zip"
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -112,6 +114,7 @@ def zip_folder(folder_path, zip_name):
                 arcname = os.path.relpath(file_path, start=folder_path)
                 zipf.write(file_path, arcname)
     return zip_path
+
 
 def clear_all_data():
     # Clear physical folders
@@ -166,38 +169,76 @@ def main():
         st.session_state.total_files_uploaded = 0
         st.session_state.is_uploading = False
 
-    # File uploader with progress bar and spinner
-    uploaded_files = st.file_uploader(
-        "Upload Image Files", 
-        type=["jpg", "jpeg", "png"], 
-        accept_multiple_files=True
-    )
+    # File uploader with state tracking and loading state
+    with st.spinner('Uploading files...'):
+        uploaded_files = st.file_uploader(
+            "Upload Image Files", 
+            type=["jpg", "jpeg", "png"], 
+            accept_multiple_files=True,
+            key=f"file_uploader_{st.session_state.get('upload_key', 0)}"
+        )
 
+    # Track uploaded files
     if uploaded_files:
-        with st.spinner('Uploading files...'):
-            for i, file in enumerate(uploaded_files):
-                progress_text = f"Uploading {file.name} ({i+1}/{len(uploaded_files)})..."
-                st.progress((i + 1) / len(uploaded_files))
-                temp_path = os.path.join("uploads", file.name)
-                with open(temp_path, "wb") as f:
-                    f.write(file.getbuffer())
-            st.success(f"{len(uploaded_files)} files uploaded successfully!")
+        st.session_state.uploaded_files = uploaded_files
+        st.session_state.total_files_uploaded = len(uploaded_files)
+        st.session_state.is_uploading = False
+        st.write(f"{st.session_state.total_files_uploaded} file(s) successfully uploaded.")
 
-    # Processing button
-    if uploaded_files:
-        if st.button("Process Images"):
+    # Processing button with enhanced state management
+    if st.session_state.total_files_uploaded > 0:
+        if st.button("Process Images", key="process_button"):
             try:
                 with st.spinner("Processing images..."):
-                    output_folder = classify_faces(uploaded_files)
+                    output_folder = classify_faces(st.session_state.uploaded_files)
+                    
+                    # Update session states
                     st.session_state.processing_completed = True
                     st.session_state.output_folder = output_folder
-                    st.success("Processing complete!")
+                    st.session_state.processing_error = False
+
+                    # Increment upload key to force uploader reset
+                    st.session_state['upload_key'] = st.session_state.get('upload_key', 0) + 1
+
+                st.success(f"Processing complete! Output folder: {output_folder}")
+
             except Exception as e:
-                st.error(f"Error processing images: {e}")
+                st.session_state.processing_completed = False
+                st.session_state.processing_error = True
+                st.error(f"Processing failed: {str(e)}")
 
     # Display results if processing is completed
-    if st.session_state.get("processing_completed"):
-        st.write("Processing completed!")
+    if st.session_state.processing_completed:
+        output_folder = st.session_state.output_folder
+        
+        if os.path.exists(output_folder):
+            for folder_name in sorted(os.listdir(output_folder)):
+                folder_path = os.path.join(output_folder, folder_name)
+                st.write(f"\U0001F4C2 Folder: {folder_name}")
+
+                files = sorted(os.listdir(folder_path))
+                num_columns = 4
+                columns = st.columns(num_columns)
+
+                for idx, file_name in enumerate(files[:8]):
+                    file_path = os.path.join(folder_path, file_name)
+                    column_idx = idx % num_columns
+                    with columns[column_idx]:
+                        st.image(file_path, caption=file_name, width=150)
+
+            # Zip and download option
+            zip_path = zip_folder(output_folder, "output_test")
+            with open(zip_path, "rb") as zip_file:
+                st.download_button(
+                    label="Download Processed Output",
+                    data=zip_file,
+                    file_name="output_test.zip",
+                    mime="application/zip"
+                )
+
+    # Error handling state
+    if st.session_state.processing_error:
+        st.warning("There was an error during processing. Please try again.")
 
 if __name__ == "__main__":
     main()
