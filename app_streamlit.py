@@ -7,14 +7,21 @@ import numpy as np
 from keras_facenet import FaceNet
 from ultralytics import YOLO
 import zipfile
+import logging
+from tqdm import tqdm
+
+# --- Set up logging ---
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Load YOLO Model and Face Embeddings ---
 @st.cache_resource
 def load_yolo_model():
+    logging.info("Loading YOLO model...")
     return YOLO("yolov8n-face.pt")
 
 @st.cache_resource
 def load_face_embeddings():
+    logging.info("Loading face embeddings...")
     with open("face_embeddings.pkl", "rb") as f:
         return pickle.load(f)
 
@@ -46,13 +53,16 @@ def clear_folder(folder_path):
         shutil.rmtree(folder_path)
     os.makedirs(folder_path, exist_ok=True)
 
+@st.cache_data
 def classify_faces(file_list, output_folder="output_test"):
     unknown_folder = os.path.join(output_folder, "unknown")
-    os.makedirs("uploads", exist_ok=True)  # Ensure 'uploads' folder exists
     clear_folder(output_folder)
     clear_folder(unknown_folder)
 
-    for file in file_list:
+    progress_bar = st.progress(0)
+    total_files = len(file_list)
+
+    for idx, file in enumerate(tqdm(file_list, desc="Processing images")):
         try:
             temp_path = os.path.join("uploads", file.name)
             with open(temp_path, "wb") as f:
@@ -60,11 +70,13 @@ def classify_faces(file_list, output_folder="output_test"):
             
             image = cv2.imread(temp_path)
             if image is None:
+                logging.warning(f"Invalid image: {file.name}.")
                 st.error(f"Invalid image: {file.name}.")
                 continue
 
             results = yolo_model.predict(image)
             if not results or not results[0].boxes:
+                logging.info(f"No faces found in {file.name}.")
                 st.warning(f"No faces found in {file.name}.")
                 continue
 
@@ -82,7 +94,10 @@ def classify_faces(file_list, output_folder="output_test"):
                     shutil.copy(temp_path, unknown_folder)
 
         except Exception as e:
+            logging.error(f"Error processing file {file.name}: {e}")
             st.error(f"Error processing file {file.name}: {e}")
+
+        progress_bar.progress((idx + 1) / total_files)
 
     return output_folder
 
@@ -97,7 +112,6 @@ def zip_folder(folder_path, zip_name):
                 zipf.write(file_path, arcname)
     return zip_path
 
-# --- Streamlit Application ---
 def clear_uploads_folder(folder_path="uploads"):
     """
     Clear the contents of the uploads folder and reset the session state for uploaded files.
@@ -111,10 +125,9 @@ def clear_uploads_folder(folder_path="uploads"):
                 else:
                     os.remove(file_path)
             except Exception as e:
-                print(f"Error while deleting {file_path}: {e}")
+                logging.error(f"Error while deleting {file_path}: {e}")
     os.makedirs(folder_path, exist_ok=True)
 
-    # Reset uploaded files in session state
     if "uploaded_files" in st.session_state:
         del st.session_state["uploaded_files"]
 
@@ -124,14 +137,14 @@ def main():
 
     # --- Button to Clear Uploads Folder ---
     if st.button("Clear"):
-        clear_uploads_folder()
-        st.session_state.uploaded_files = []  # Clear uploaded files in session state
-        st.success("Uploads folder has been cleared and reset.")
+        if st.confirm("Are you sure you want to clear all uploaded files?"):
+            clear_uploads_folder()
+            st.session_state.uploaded_files = []
+            st.success("Uploads folder has been cleared and reset.")
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-    # Save uploaded files in session state
     if uploaded_files:
         st.session_state.uploaded_files = uploaded_files
         st.write(f"{len(uploaded_files)} file(s) successfully uploaded.")
@@ -139,37 +152,33 @@ def main():
     # --- Process the uploaded files ---
     if "uploaded_files" in st.session_state and st.session_state.uploaded_files:
         if st.button("Process Images"):
-            output_folder = classify_faces(st.session_state.uploaded_files)
-            st.success(f"Processing complete! Output folder: {output_folder}")
+            with st.spinner("Processing images..."):
+                output_folder = classify_faces(st.session_state.uploaded_files)
+                st.success(f"Processing complete! Output folder: {output_folder}")
 
-            if os.path.exists(output_folder):
-                # Iterate over subfolders (e.g., person folders, 'unknown' folder)
-                for folder_name in sorted(os.listdir(output_folder)):  # Sort subfolders alphabetically
-                    folder_path = os.path.join(output_folder, folder_name)
-                    st.write(f"📂 Folder: {folder_name}")
-                    
-                    # List and display files in each subfolder
-                    files = sorted(os.listdir(folder_path))  # Sort files within each subfolder
-                    
-                    # Create columns dynamically based on the number of files to display
-                    num_columns = 4  # Adjust the number of columns to fit the screen
-                    columns = st.columns(num_columns)
+                if os.path.exists(output_folder):
+                    for folder_name in sorted(os.listdir(output_folder)):
+                        folder_path = os.path.join(output_folder, folder_name)
+                        st.write(f"📂 Folder: {folder_name}")
 
-                    for idx, file_name in enumerate(files[:5]):  # Limit to 5 files for preview
-                        file_path = os.path.join(folder_path, file_name)
-                        column_idx = idx % num_columns  # Ensure files fit in columns
-                        with columns[column_idx]:
-                            st.image(file_path, caption=file_name, width=150)  # Smaller preview size
+                        files = sorted(os.listdir(folder_path))
+                        num_columns = 4
+                        columns = st.columns(num_columns)
 
-                # Add download link for the output folder
-                zip_path = zip_folder(output_folder, "output_test")
-                with open(zip_path, "rb") as zip_file:
-                    st.download_button(
-                        label="Download Processed Output",
-                        data=zip_file,
-                        file_name="output_test.zip",
-                        mime="application/zip"
-                    )
+                        for idx, file_name in enumerate(files[:8]):  # Adjust limit for previews
+                            file_path = os.path.join(folder_path, file_name)
+                            column_idx = idx % num_columns
+                            with columns[column_idx]:
+                                st.image(file_path, caption=file_name, width=150)
+
+                    zip_path = zip_folder(output_folder, "output_test")
+                    with open(zip_path, "rb") as zip_file:
+                        st.download_button(
+                            label="Download Processed Output",
+                            data=zip_file,
+                            file_name="output_test.zip",
+                            mime="application/zip"
+                        )
 
 if __name__ == "__main__":
     main()
