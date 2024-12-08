@@ -161,13 +161,16 @@ def main():
     # Clear button with more explicit reset
     if st.button("Clear All"):
         clear_all_data()
-        st.rerun()  # Updated from experimental_rerun()
+        st.session_state.processing_completed = False
+        st.session_state.processing_error = False
+        st.session_state.total_files_uploaded = 0
 
     # File uploader with state tracking
     uploaded_files = st.file_uploader(
         "Upload Image Files", 
         type=["jpg", "jpeg", "png"], 
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key=f"file_uploader_{st.session_state.get('upload_key', 0)}"  # Unique key to reset uploader
     )
 
     # Track uploaded files
@@ -178,7 +181,7 @@ def main():
 
     # Processing button with enhanced state management
     if st.session_state.total_files_uploaded > 0:
-        if st.button("Process Images"):
+        if st.button("Process Images", key="process_button"):
             try:
                 with st.spinner("Processing images..."):
                     output_folder = classify_faces(st.session_state.uploaded_files)
@@ -187,6 +190,9 @@ def main():
                     st.session_state.processing_completed = True
                     st.session_state.output_folder = output_folder
                     st.session_state.processing_error = False
+
+                    # Increment upload key to force uploader reset
+                    st.session_state['upload_key'] = st.session_state.get('upload_key', 0) + 1
 
                 st.success(f"Processing complete! Output folder: {output_folder}")
 
