@@ -68,8 +68,7 @@ def classify_faces(file_list, output_folder="output_test"):
             temp_path = os.path.join("uploads", file.name)
             with open(temp_path, "wb") as f:
                 f.write(file.getbuffer())
-            
-            # Ensure file is successfully saved
+
             if not os.path.exists(temp_path):
                 raise FileNotFoundError(f"File {temp_path} not found after writing.")
 
@@ -107,7 +106,6 @@ def classify_faces(file_list, output_folder="output_test"):
     return output_folder
 
 def zip_folder(folder_path, zip_name):
-    """Create a ZIP file of the given folder."""
     zip_path = f"{zip_name}.zip"
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(folder_path):
@@ -118,10 +116,6 @@ def zip_folder(folder_path, zip_name):
     return zip_path
 
 def clear_all_data():
-    """
-    Clear all application data, including uploaded files and processed output.
-    Reset session state to initial conditions.
-    """
     folders_to_clear = ["uploads", "output_test"]
     for folder in folders_to_clear:
         if os.path.exists(folder):
@@ -136,19 +130,16 @@ def main():
     st.title("Face Classification App")
     st.write("Upload all image files you want to classify.")
 
-    # --- Button to Clear All Data ---
     if st.button("Clear"):
         clear_all_data()
         st.success("Application has been reset to its initial state.")
 
-    # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
     if uploaded_files:
         st.session_state.uploaded_files = uploaded_files
         st.write(f"{len(uploaded_files)} file(s) successfully uploaded.")
 
-    # --- Process the uploaded files ---
     if "uploaded_files" in st.session_state and st.session_state.uploaded_files:
         if st.button("Process Images"):
             with st.spinner("Processing images..."):
@@ -164,7 +155,7 @@ def main():
                         num_columns = 4
                         columns = st.columns(num_columns)
 
-                        for idx, file_name in enumerate(files[:8]):  # Adjust limit for previews
+                        for idx, file_name in enumerate(files[:8]):
                             file_path = os.path.join(folder_path, file_name)
                             column_idx = idx % num_columns
                             with columns[column_idx]:
@@ -178,6 +169,5 @@ def main():
                             file_name="output_test.zip",
                             mime="application/zip"
                         )
-
 if __name__ == "__main__":
     main()
