@@ -8,12 +8,12 @@ from keras_facenet import FaceNet
 from ultralytics import YOLO
 import zipfile
 import logging
-from tqdm import tqdm
 
-# --- Set up logging ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- Load YOLO Model and Face Embeddings ---
+# Load models and embeddings
 @st.cache_resource
 def load_yolo_model():
     logging.info("Loading YOLO model...")
@@ -25,11 +25,12 @@ def load_face_embeddings():
     with open("face_embeddings.pkl", "rb") as f:
         return pickle.load(f)
 
+# Initialize models
 yolo_model = load_yolo_model()
 known_embeddings = load_face_embeddings()
 embedder = FaceNet()
 
-# --- Utility Functions ---
+# Utility functions
 def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
@@ -53,43 +54,40 @@ def clear_folder(folder_path):
         shutil.rmtree(folder_path)
     os.makedirs(folder_path, exist_ok=True)
 
-@st.cache_data
 def classify_faces(file_list, output_folder="output_test"):
-    os.makedirs("uploads", exist_ok=True)  # Ensure uploads folder exists
+    # Create necessary folders
+    os.makedirs("uploads", exist_ok=True)
     unknown_folder = os.path.join(output_folder, "unknown")
-    
-    # Clear existing folders
-    if os.path.exists(output_folder):
-        shutil.rmtree(output_folder)
-    os.makedirs(output_folder)
-    os.makedirs(unknown_folder)
+    clear_folder(output_folder)
+    clear_folder(unknown_folder)
 
+    # Process each uploaded file
     for file in file_list:
         try:
+            # Save uploaded file
             temp_path = os.path.join("uploads", file.name)
             with open(temp_path, "wb") as f:
                 f.write(file.getbuffer())
 
-            if not os.path.exists(temp_path):
-                raise FileNotFoundError(f"File {temp_path} not found after writing.")
-
+            # Read and validate image
             image = cv2.imread(temp_path)
             if image is None:
-                logging.warning(f"Invalid image: {file.name}.")
-                st.warning(f"Invalid image: {file.name}.")
+                st.warning(f"Invalid image: {file.name}")
                 continue
 
+            # Detect faces
             results = yolo_model.predict(image)
             if not results or not results[0].boxes:
-                logging.info(f"No faces found in {file.name}.")
-                st.warning(f"No faces found in {file.name}.")
+                st.warning(f"No faces found in {file.name}")
                 continue
 
+            # Process each detected face
             for bbox in results[0].boxes.xyxy.numpy():
                 face_image = crop_face(image, bbox)
                 face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
                 face_embedding = embedder.embeddings([face_image_rgb])[0]
 
+                # Find and categorize face
                 match = find_match(face_embedding)
                 if match:
                     person_folder = os.path.join(output_folder, match)
@@ -99,103 +97,95 @@ def classify_faces(file_list, output_folder="output_test"):
                     shutil.copy(temp_path, unknown_folder)
 
         except Exception as e:
-            logging.error(f"Error processing file {file.name}: {e}")
-            st.error(f"Error processing file {file.name}: {e}")
+            st.error(f"Error processing {file.name}: {e}")
 
     return output_folder
+
+def zip_folder(folder_path, zip_name):
+    zip_path = f"{zip_name}.zip"
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, start=folder_path)
+                zipf.write(file_path, arcname)
+    return zip_path
+
+def reset_application_state():
+    # Clear physical folders
+    folders_to_clear = ["uploads", "output_test"]
+    for folder in folders_to_clear:
+        if os.path.exists(folder):
+            shutil.rmtree(folder)
+        os.makedirs(folder, exist_ok=True)
+    
+    # Reset session states
+    states_to_reset = [
+        "uploaded_files", 
+        "processing_completed", 
+        "output_folder", 
+        "total_files_uploaded"
+    ]
+    
+    for state in states_to_reset:
+        if state in st.session_state:
+            del st.session_state[state]
 
 def main():
     st.title("Face Classification App")
     st.write("Upload all image files you want to classify.")
 
-    # Initialize session states if not already set
-    if 'processing_completed' not in st.session_state:
-        st.session_state.processing_completed = False
-    if 'processing_error' not in st.session_state:
-        st.session_state.processing_error = False
-    if 'total_files_uploaded' not in st.session_state:
-        st.session_state.total_files_uploaded = 0
-    if 'is_uploading' not in st.session_state:
-        st.session_state.is_uploading = False
-
-    # Clear button with more explicit reset
+    # Clear button
     if st.button("Clear All"):
-        clear_all_data()
-        st.session_state.processing_completed = False
-        st.session_state.processing_error = False
-        st.session_state.total_files_uploaded = 0
-        st.session_state.is_uploading = False
+        reset_application_state()
+        st.rerun()
 
-    # File uploader with state tracking and loading state
-    with st.spinner('Uploading files...'):
-        uploaded_files = st.file_uploader(
-            "Upload Image Files", 
-            type=["jpg", "jpeg", "png"], 
-            accept_multiple_files=True,
-            key=f"file_uploader_{st.session_state.get('upload_key', 0)}"
-        )
+    # File uploader
+    uploaded_files = st.file_uploader(
+        "Upload Image Files", 
+        type=["jpg", "jpeg", "png"], 
+        accept_multiple_files=True
+    )
 
     # Track uploaded files
     if uploaded_files:
-        st.session_state.uploaded_files = uploaded_files
-        st.session_state.total_files_uploaded = len(uploaded_files)
-        st.session_state.is_uploading = False
-        st.write(f"{st.session_state.total_files_uploaded} file(s) successfully uploaded.")
+        st.write(f"{len(uploaded_files)} file(s) successfully uploaded.")
 
-    # Processing button with enhanced state management
-    if st.session_state.total_files_uploaded > 0:
-        if st.button("Process Images", key="process_button"):
-            try:
-                with st.spinner("Processing images..."):
-                    output_folder = classify_faces(st.session_state.uploaded_files)
-                    
-                    # Update session states
-                    st.session_state.processing_completed = True
-                    st.session_state.output_folder = output_folder
-                    st.session_state.processing_error = False
+    # Process button
+    if uploaded_files:
+        if st.button("Process Images"):
+            with st.spinner("Processing images..."):
+                try:
+                    output_folder = classify_faces(uploaded_files)
+                    st.success(f"Processing complete! Output folder: {output_folder}")
 
-                    # Increment upload key to force uploader reset
-                    st.session_state['upload_key'] = st.session_state.get('upload_key', 0) + 1
+                    # Display processed images
+                    for folder_name in sorted(os.listdir(output_folder)):
+                        folder_path = os.path.join(output_folder, folder_name)
+                        st.write(f"\U0001F4C2 Folder: {folder_name}")
 
-                st.success(f"Processing complete! Output folder: {output_folder}")
+                        files = sorted(os.listdir(folder_path))
+                        num_columns = 4
+                        columns = st.columns(num_columns)
 
-            except Exception as e:
-                st.session_state.processing_completed = False
-                st.session_state.processing_error = True
-                st.error(f"Processing failed: {str(e)}")
+                        for idx, file_name in enumerate(files[:8]):
+                            file_path = os.path.join(folder_path, file_name)
+                            column_idx = idx % num_columns
+                            with columns[column_idx]:
+                                st.image(file_path, caption=file_name, width=150)
 
-    # Display results if processing is completed
-    if st.session_state.processing_completed:
-        output_folder = st.session_state.output_folder
-        
-        if os.path.exists(output_folder):
-            for folder_name in sorted(os.listdir(output_folder)):
-                folder_path = os.path.join(output_folder, folder_name)
-                st.write(f"\U0001F4C2 Folder: {folder_name}")
+                    # Zip and download option
+                    zip_path = zip_folder(output_folder, "output_test")
+                    with open(zip_path, "rb") as zip_file:
+                        st.download_button(
+                            label="Download Processed Output",
+                            data=zip_file,
+                            file_name="output_test.zip",
+                            mime="application/zip"
+                        )
 
-                files = sorted(os.listdir(folder_path))
-                num_columns = 4
-                columns = st.columns(num_columns)
-
-                for idx, file_name in enumerate(files[:8]):
-                    file_path = os.path.join(folder_path, file_name)
-                    column_idx = idx % num_columns
-                    with columns[column_idx]:
-                        st.image(file_path, caption=file_name, width=150)
-
-            # Zip and download option
-            zip_path = zip_folder(output_folder, "output_test")
-            with open(zip_path, "rb") as zip_file:
-                st.download_button(
-                    label="Download Processed Output",
-                    data=zip_file,
-                    file_name="output_test.zip",
-                    mime="application/zip"
-                )
-
-    # Error handling state
-    if st.session_state.processing_error:
-        st.warning("There was an error during processing. Please try again.")
+                except Exception as e:
+                    st.error(f"Processing failed: {e}")
 
 if __name__ == "__main__":
     main()
