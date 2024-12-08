@@ -55,7 +55,7 @@ def clear_folder(folder_path):
 
 @st.cache_data
 def classify_faces(file_list, output_folder="output_test"):
-    os.makedirs("uploads", exist_ok=True)  # Pastikan folder uploads ada
+    os.makedirs("uploads", exist_ok=True)  # Ensure uploads folder exists
     unknown_folder = os.path.join(output_folder, "unknown")
     clear_folder(output_folder)
     clear_folder(unknown_folder)
@@ -69,7 +69,7 @@ def classify_faces(file_list, output_folder="output_test"):
             with open(temp_path, "wb") as f:
                 f.write(file.getbuffer())
             
-            # Pastikan file berhasil disimpan
+            # Ensure file is successfully saved
             if not os.path.exists(temp_path):
                 raise FileNotFoundError(f"File {temp_path} not found after writing.")
 
@@ -106,7 +106,6 @@ def classify_faces(file_list, output_folder="output_test"):
 
     return output_folder
 
-
 def zip_folder(folder_path, zip_name):
     """Create a ZIP file of the given folder."""
     zip_path = f"{zip_name}.zip"
@@ -140,7 +139,7 @@ def main():
     # --- Button to Clear All Data ---
     if st.button("Clear"):
         clear_all_data()
-        st.success("Application has been reset. Please upload new files to start.")
+        st.success("Application has been reset to its initial state.")
 
     # --- File Upload ---
     uploaded_files = st.file_uploader("Upload Image Files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
