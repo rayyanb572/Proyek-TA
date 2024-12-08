@@ -161,7 +161,7 @@ def main():
     # Clear button with more explicit reset
     if st.button("Clear All"):
         clear_all_data()
-        st.experimental_rerun()  # Rerun the app to reflect the reset
+        st.rerun()  # Updated from experimental_rerun()
 
     # File uploader with state tracking
     uploaded_files = st.file_uploader(
