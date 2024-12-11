@@ -2,5 +2,6 @@ __pycache__/
 *.pyc
 *.pkl
 venv/
-temp_uploads/
+uploads/
 output_test/
+output_test.zip

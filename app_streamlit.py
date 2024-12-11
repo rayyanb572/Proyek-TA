@@ -148,7 +148,8 @@ def reset_session_states():
     st.session_state.total_files_uploaded = 0
 
 def main():
-    st.title("Face Classification App")
+
+    st.header("Face Database-Driven Photo Classifier", divider="gray")
     st.write("Upload all image files you want to classify.")
 
     # Initialize session states if not already set
