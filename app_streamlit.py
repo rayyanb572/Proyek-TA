@@ -114,7 +114,7 @@ def zip_folder(folder_path, zip_name):
     return zip_path
 
 def clear_all_data():
-    # Clear physical folders
+    # Clear physical folders (uploads and output folders)
     folders_to_clear = ["uploads", "output_test"]
     for folder in folders_to_clear:
         if os.path.exists(folder):
@@ -122,11 +122,19 @@ def clear_all_data():
     for folder in folders_to_clear:
         os.makedirs(folder, exist_ok=True)
 
-    # Reset all session states
-    reset_session_states()
+    # Reset session states related to uploaded files and processing status
+    st.session_state.processing_completed = False
+    st.session_state.processing_error = False
+    st.session_state.total_files_uploaded = 0
+    st.session_state.is_uploading = False
 
-    # Increment upload key to reset uploader
-    st.session_state['upload_key'] += 1
+    # Reset the uploaded files list to allow a new upload
+    st.session_state.uploaded_files = []
+    st.session_state.output_folder = None
+    st.session_state.processing_error = False
+
+    # Increment upload key to reset uploader widget and force a fresh state
+    st.session_state.upload_key += 1
 
 def reset_session_states():
     # Reset all application-specific session states
@@ -192,6 +200,11 @@ def main():
             try:
                 with st.spinner("Processing images..."):
                     output_folder = classify_faces(st.session_state.uploaded_files)
+
+                    # Ensure output folder is not empty
+                    if not os.listdir(output_folder):
+                        st.warning("No images processed. Please check the uploaded files or face detection settings.")
+                        return
 
                     # Update session states
                     st.session_state.processing_completed = True
