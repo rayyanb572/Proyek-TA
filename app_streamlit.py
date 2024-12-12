@@ -56,7 +56,7 @@ def clear_folder(folder_path):
 def classify_faces(file_list, output_folder="output_test"):
     os.makedirs("uploads", exist_ok=True)  # Ensure uploads folder exists
     unknown_folder = os.path.join(output_folder, "unknown")
-    
+
     # Clear existing folders
     if os.path.exists(output_folder):
         shutil.rmtree(output_folder)
@@ -103,8 +103,6 @@ def classify_faces(file_list, output_folder="output_test"):
 
     return output_folder
 
-
-
 def zip_folder(folder_path, zip_name):
     zip_path = f"{zip_name}.zip"
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -114,7 +112,6 @@ def zip_folder(folder_path, zip_name):
                 arcname = os.path.relpath(file_path, start=folder_path)
                 zipf.write(file_path, arcname)
     return zip_path
-
 
 def clear_all_data():
     # Clear physical folders
@@ -127,6 +124,9 @@ def clear_all_data():
 
     # Reset all session states
     reset_session_states()
+
+    # Increment upload key to reset uploader
+    st.session_state['upload_key'] += 1
 
 def reset_session_states():
     # Reset all application-specific session states
@@ -148,7 +148,6 @@ def reset_session_states():
     st.session_state.total_files_uploaded = 0
 
 def main():
-
     st.header("Face Database-Driven Photo Classifier", divider="gray")
     st.write("Upload all image files you want to classify.")
 
@@ -161,6 +160,8 @@ def main():
         st.session_state.total_files_uploaded = 0
     if 'is_uploading' not in st.session_state:
         st.session_state.is_uploading = False
+    if 'upload_key' not in st.session_state:
+        st.session_state.upload_key = 0
 
     # Clear button with more explicit reset
     if st.button("Clear All"):
@@ -170,14 +171,13 @@ def main():
         st.session_state.total_files_uploaded = 0
         st.session_state.is_uploading = False
 
-    # File uploader with state tracking and loading state
-    with st.spinner('Uploading files...'):
-        uploaded_files = st.file_uploader(
-            "Upload Image Files", 
-            type=["jpg", "jpeg", "png"], 
-            accept_multiple_files=True,
-            key=f"file_uploader_{st.session_state.get('upload_key', 0)}"
-        )
+    # File uploader with state tracking and dynamic key
+    uploaded_files = st.file_uploader(
+        "Upload Image Files", 
+        type=["jpg", "jpeg", "png"], 
+        accept_multiple_files=True,
+        key=f"file_uploader_{st.session_state['upload_key']}"  # Dynamic key
+    )
 
     # Track uploaded files
     if uploaded_files:
@@ -186,20 +186,17 @@ def main():
         st.session_state.is_uploading = False
         st.write(f"{st.session_state.total_files_uploaded} file(s) successfully uploaded.")
 
-    # Processing button with enhanced state management
+    # Processing button
     if st.session_state.total_files_uploaded > 0:
         if st.button("Process Images", key="process_button"):
             try:
                 with st.spinner("Processing images..."):
                     output_folder = classify_faces(st.session_state.uploaded_files)
-                    
+
                     # Update session states
                     st.session_state.processing_completed = True
                     st.session_state.output_folder = output_folder
                     st.session_state.processing_error = False
-
-                    # Increment upload key to force uploader reset
-                    st.session_state['upload_key'] = st.session_state.get('upload_key', 0) + 1
 
                 st.success(f"Processing complete! Output folder: {output_folder}")
 
@@ -211,7 +208,7 @@ def main():
     # Display results if processing is completed
     if st.session_state.processing_completed:
         output_folder = st.session_state.output_folder
-        
+
         if os.path.exists(output_folder):
             for folder_name in sorted(os.listdir(output_folder)):
                 folder_path = os.path.join(output_folder, folder_name)
